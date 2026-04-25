@@ -62,11 +62,28 @@
             white-space: nowrap;
         }
         .hbtn:active { transform: scale(0.92); }
-        .hbtn-save     { background: linear-gradient(135deg,#27ae60,#2ecc71); color:#fff; }
+        .hbtn-save     { background: linear-gradient(135deg,#27ae60,#2ecc71); color:#fff; position: relative; }
         .hbtn-board    { background: linear-gradient(135deg,#f39c12,#f1c40f); color:#1a0a00; }
         .hbtn-prestige { background: linear-gradient(135deg,#8e44ad,#9b59b6); color:#fff; }
         .hbtn-reset    { background: linear-gradient(135deg,#c0392b,#e74c3c); color:#fff; }
         .hbtn:disabled { opacity: 0.35; }
+
+        /* Auto-save indicator on save button */
+        .save-pulse {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #2ecc71;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
 
         /* ── BOTTOM NAV ── */
         .bottom-nav {
@@ -609,7 +626,10 @@
         COCO CLICKER
     </div>
     <div class="header-btns">
-        <button class="hbtn hbtn-save"     onclick="saveGame()">💾</button>
+        <button class="hbtn hbtn-save" onclick="saveGame(true)">
+            💾
+            <span class="save-pulse" id="savePulse"></span>
+        </button>
         <button class="hbtn hbtn-board"    onclick="openModal('lbModal')">🏆</button>
         <button class="hbtn hbtn-prestige" id="prestigeBtn" onclick="openModal('pgModal')" disabled>🌟</button>
         <button class="hbtn hbtn-reset"    onclick="openModal('rstModal')">🔄</button>
@@ -674,6 +694,7 @@
         <div class="stat-row"><span class="stat-lbl">Playtime</span>      <span class="stat-val" id="sTime">0:00</span></div>
         <div class="stat-row"><span class="stat-lbl">Prestige Level</span><span class="stat-val" id="sPrestige">0</span></div>
         <div class="stat-row"><span class="stat-lbl">Golden Cocos</span>  <span class="stat-val" id="sGolden">0</span></div>
+        <div class="stat-row"><span class="stat-lbl">Last Save</span>     <span class="stat-val" id="sLastSave">Just now</span></div>
         <div class="prog-bar"><div class="prog-fill" id="cpsBar" style="width:0%"></div></div>
     </div>
 
@@ -752,7 +773,7 @@
 </div>
 
 <!-- Save dot -->
-<div class="save-dot" id="saveDot">✅ Saved!</div>
+<div class="save-dot" id="saveDot">✅ Auto-saved!</div>
 
 <script>
 /* ══════════════════════════════════════════
@@ -847,6 +868,14 @@ function fmtTime(s){
 }
 function totalBld(g){ return Object.values(g.buildings).reduce((a,b)=>a+b.count,0); }
 
+function timeSince(ms){
+    const s = Math.floor((Date.now() - ms) / 1000);
+    if(s < 10) return 'Just now';
+    if(s < 60) return s + 's ago';
+    if(s < 3600) return Math.floor(s/60) + 'm ago';
+    return Math.floor(s/3600) + 'h ago';
+}
+
 /* ══════════════════════════════════════════
    CALCULATIONS
 ══════════════════════════════════════════ */
@@ -887,6 +916,50 @@ function recalc(){
 }
 
 /* ══════════════════════════════════════════
+   AUTO-SAVE (THROTTLED)
+══════════════════════════════════════════ */
+let saveQueued = false;
+let lastActualSave = Date.now();
+
+function queueSave(){
+    if(saveQueued) return;
+    saveQueued = true;
+    
+    // Throttle to max 1 save per second during rapid actions
+    const timeSinceLastSave = Date.now() - lastActualSave;
+    const delay = Math.max(0, 1000 - timeSinceLastSave);
+    
+    setTimeout(() => {
+        saveGame(false);
+        saveQueued = false;
+    }, delay);
+}
+
+function saveGame(manual = false){
+    G.lastSave = Date.now();
+    lastActualSave = Date.now();
+    
+    try {
+        localStorage.setItem('cocoClickerSave', JSON.stringify(G));
+        
+        if(manual) {
+            const d = document.getElementById('saveDot');
+            d.textContent = '✅ Saved!';
+            d.classList.add('show');
+            setTimeout(() => d.classList.remove('show'), 2000);
+        } else {
+            const d = document.getElementById('saveDot');
+            d.textContent = '✅ Auto-saved!';
+            d.classList.add('show');
+            setTimeout(() => d.classList.remove('show'), 1500);
+        }
+    } catch(e) {
+        console.error('Save failed:', e);
+        toast('❌ Save failed! Storage full?');
+    }
+}
+
+/* ══════════════════════════════════════════
    CLICKING
 ══════════════════════════════════════════ */
 let recentClicks=[];
@@ -917,6 +990,9 @@ function clickCoco(e){
     spawnParticles(e);
     spawnRipple(e);
     checkAch();
+    
+    // Auto-save after click
+    queueSave();
 }
 
 function spawnFloater(e,txt){
@@ -974,6 +1050,9 @@ function buyBuilding(id){
     recalc();
     renderShop();
     checkAch();
+    
+    // Auto-save after purchase
+    queueSave();
 }
 
 function buyUpgrade(id){
@@ -986,6 +1065,9 @@ function buyUpgrade(id){
     renderUpgrades();
     checkAch();
     toast(`⬆️ ${def.name} unlocked!`);
+    
+    // Auto-save after upgrade
+    queueSave();
 }
 
 function reqMet(def){
@@ -1038,6 +1120,9 @@ function clickGoldenCoco(){
         toast(`🍀 Lucky! +${fmt(bonus)} 🥥`);
     }
     checkAch();
+    
+    // Auto-save after golden cookie
+    queueSave();
 }
 
 function scheduleGoldenCoco(){
@@ -1054,6 +1139,7 @@ function checkAch(){
             G.achievements.push(a.id);
             toast(`🏅 Achievement: ${a.name}!`);
             renderAch();
+            queueSave();
         }
     });
 }
@@ -1079,20 +1165,12 @@ function doPrestige(){
     recalc(); renderAll();
     closeModal('pgModal');
     toast(`🌟 Prestige ${G.prestigeLvl}! +${G.prestigeBonus}% bonus`);
-    saveGame();
+    saveGame(true);
 }
 
 /* ══════════════════════════════════════════
    SAVE / LOAD
 ══════════════════════════════════════════ */
-function saveGame(){
-    G.lastSave=Date.now();
-    localStorage.setItem('cocoClickerSave',JSON.stringify(G));
-    const d=document.getElementById('saveDot');
-    d.classList.add('show');
-    setTimeout(()=>d.classList.remove('show'),2200);
-}
-
 function loadGame(){
     const raw=localStorage.getItem('cocoClickerSave');
     if(!raw) return;
@@ -1100,7 +1178,7 @@ function loadGame(){
         const s=JSON.parse(raw);
         const keys=['cocos','totalEarned','totalClicks','cps','clickPower',
                     'prestigeLvl','prestigeBonus','goldenClicks','peakCPS',
-                    'playtime','activeBuff','buffEnd','achievements'];
+                    'playtime','activeBuff','buffEnd','achievements','lastSave'];
         keys.forEach(k=>{ if(s[k]!==undefined) G[k]=s[k]; });
         if(s.buildings) BUILDINGS.forEach(b=>{ if(s.buildings[b.id]) G.buildings[b.id]=s.buildings[b.id]; });
         if(s.upgrades)  s.upgrades.forEach(su=>{ const f=G.upgrades.find(u=>u.id===su.id); if(f) f.owned=su.owned; });
@@ -1118,6 +1196,7 @@ function loadGame(){
             }
         }
         recalc();
+        toast('📂 Game loaded!');
     } catch(e){ console.error(e); }
 }
 
@@ -1181,6 +1260,7 @@ function renderStats(){
     document.getElementById('sTime').textContent=fmtTime(G.playtime);
     document.getElementById('sPrestige').textContent=G.prestigeLvl;
     document.getElementById('sGolden').textContent=G.goldenClicks;
+    document.getElementById('sLastSave').textContent=timeSince(G.lastSave);
 
     const pct=G.cps>0?Math.min(100,Math.log10(G.cps+1)/Math.log10(1e6)*100):0;
     document.getElementById('cpsBar').style.width=pct+'%';
@@ -1330,7 +1410,7 @@ function hardReset(){ localStorage.clear(); location.reload(); }
 /* ══════════════════════════════════════════
    GAME LOOP
 ══════════════════════════════════════════ */
-let lastTick=Date.now(), autoSaveTimer=0;
+let lastTick=Date.now();
 
 function loop(){
     const now=Date.now();
@@ -1341,9 +1421,6 @@ function loop(){
     G.cocos+=prod;
     G.totalEarned+=prod;
     G.playtime+=dt;
-
-    autoSaveTimer+=dt;
-    if(autoSaveTimer>=30){ autoSaveTimer=0; saveGame(); }
 
     checkAch();
     renderStats();
