@@ -1,33 +1,261 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <!-- Фикс кодировки для корректного русского языка -->
     <meta charset="UTF-8">
-    <title>Coconut Clicker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Неоновый Кликер Про</title>
     <style>
-        body {
-          text-align: center;
-          font-family: sans-serif;
+        :root {
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --accent: #f093fb;
+            --bg: #0f172a;
+            --glass: rgba(255, 255, 255, 0.1);
         }
-        button {
-          font-size: 30px;
-          padding: 20px;
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Верхняя панель */
+        .header {
+            padding: 20px;
+            text-align: center;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #score {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin: 0;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(79, 172, 254, 0.5));
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            color: #94a3b8;
+        }
+
+        /* Игровое поле */
+        .click-zone {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        #main-btn {
+            width: 240px;
+            height: 240px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 6rem;
+            box-shadow: 0 0 60px rgba(79, 172, 254, 0.4);
+            border: 10px solid rgba(255,255,255,0.15);
+            transition: transform 0.05s ease;
+            position: relative;
+        }
+
+        #main-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* Анимация клика */
+        .click-text {
+            position: absolute;
+            font-weight: 900;
+            pointer-events: none;
+            animation: floatUp 0.7s cubic-bezier(0, 0, 0.2, 1) forwards;
+            color: var(--primary);
+            font-size: 2rem;
+            text-shadow: 0 0 10px black;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-200px) scale(1.5); opacity: 0; }
+        }
+
+        /* Магазин */
+        .shop {
+            background: rgba(15, 23, 42, 0.9);
+            border-radius: 30px 30px 0 0;
+            padding: 20px;
+            height: 45%;
+            overflow-y: auto;
+            border-top: 2px solid var(--primary);
+        }
+
+        .section-title {
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+
+        .item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .item.can-buy {
+            border-color: var(--primary);
+            background: rgba(0, 242, 254, 0.05);
+        }
+
+        .item-info { flex: 1; }
+        .item-info h4 { margin: 0; font-size: 1.1rem; }
+        .item-info p { margin: 4px 0 0; font-size: 0.8rem; color: #94a3b8; }
+
+        .btn-buy {
+            background: var(--primary);
+            color: #0f172a;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .btn-buy:disabled {
+            background: #334155;
+            color: #64748b;
         }
     </style>
 </head>
 <body>
 
-<h1>🥥 Coconut Clicker</h1>
-<button onclick="clickCoco()">КЛИК!</button>
-<p id="score">0</p>
+    <div class="header">
+        <div id="score">0</div>
+        <div class="stats-row">
+            <span>Клик: <b id="click-v">1</b></span>
+            <span>Множитель: <b id="mult-v">x1</b></span>
+        </div>
+    </div>
 
-<script>
-    let score = 0;
+    <div class="click-zone" id="zone">
+        <div id="main-btn">💎</div>
+    </div>
 
-    function clickCoco() {
-      score++;
-      document.getElementById("score").innerText = score;
-    }
-</script>
+    <div class="shop">
+        <div class="section-title">Улучшения и Прокачка</div>
+        <div id="shop-list"></div>
+    </div>
 
+    <script>
+        let balance = 0;
+        let power = 1;
+        let mult = 1;
+
+        const upgrades = [
+            { id: 1, name: "Острый клик", desc: "+1 к силе", cost: 15, grow: 1.5, val: 1, type: 'add' },
+            { id: 2, name: "Золотой палец", desc: "+5 к силе", cost: 100, grow: 1.6, val: 5, type: 'add' },
+            { id: 3, name: "Двойной заряд", desc: "Удваивает всё (х2)", cost: 500, grow: 2.5, val: 2, type: 'mult' },
+            { id: 4, name: "Мега множитель", desc: "Дает х5 к доходу", cost: 5000, grow: 4, val: 5, type: 'mult' },
+            { id: 5, name: "Ультра клик", desc: "+100 к силе", cost: 25000, grow: 1.5, val: 100, type: 'add' }
+        ];
+
+        const levels = {};
+        upgrades.forEach(u => levels[u.id] = 0);
+
+        function refresh() {
+            document.getElementById('score').innerText = Math.floor(balance);
+            document.getElementById('click-v').innerText = power;
+            document.getElementById('mult-v').innerText = 'x' + mult;
+            
+            const list = document.getElementById('shop-list');
+            list.innerHTML = '';
+            
+            upgrades.forEach(u => {
+                const currentCost = Math.floor(u.cost * Math.pow(u.grow, levels[u.id]));
+                const canAfford = balance >= currentCost;
+                
+                const div = document.createElement('div');
+                div.className = `item ${canAfford ? 'can-buy' : ''}`;
+                div.innerHTML = `
+                    <div class="item-info">
+                        <h4>${u.name} [Ур. ${levels[u.id]}]</h4>
+                        <p>Цена: ${currentCost} | ${u.desc}</p>
+                    </div>
+                    <button class="btn-buy" ${canAfford ? '' : 'disabled'} onclick="buy(${u.id}, ${currentCost})">
+                        КУПИТЬ
+                    </button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function buy(id, cost) {
+            if (balance >= cost) {
+                balance -= cost;
+                const up = upgrades.find(x => x.id === id);
+                levels[id]++;
+                
+                if (up.type === 'add') power += up.val;
+                else mult *= up.val;
+                
+                refresh();
+            }
+        }
+
+        document.getElementById('main-btn').addEventListener('click', (e) => {
+            const reward = power * mult;
+            balance += reward;
+
+            // Анимация текста
+            const txt = document.createElement('div');
+            txt.className = 'click-text';
+            txt.innerText = '+' + reward;
+            txt.style.left = e.clientX + 'px';
+            txt.style.top = e.clientY + 'px';
+            document.body.appendChild(txt);
+            setTimeout(() => txt.remove(), 700);
+
+            // Вибрация (если поддерживается устройством)
+            if (navigator.vibrate) navigator.vibrate(15);
+            
+            refresh();
+        });
+
+        // Первый запуск
+        refresh();
+    </script>
 </body>
 </html>

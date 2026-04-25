@@ -4,10 +4,10 @@ import android.os.Bundle
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
+// Удаляем OnBackPressedCallback, так как он завязан на AndroidX/AppCompat
+// Вместо этого используем стандартный метод onBackPressed()
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : android.app.Activity() { // Используем базовый класс
 
     private lateinit var webView: WebView
 
@@ -23,18 +23,15 @@ class MainActivity : AppCompatActivity() {
         webSettings.allowFileAccess = true
 
         webView.webViewClient = WebViewClient()
-
         webView.loadUrl("file:///android_asset/index.html")
+    }
 
-        // 🔥 НОВЫЙ способ обработки кнопки "назад"
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                } else {
-                    finish()
-                }
-            }
-        })
+    // Классический способ обработки кнопки "Назад" для базового Activity
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            super.onBackPressed()
+        }
     }
 }
