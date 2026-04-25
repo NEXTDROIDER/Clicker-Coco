@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Просто пустой файл или базовый стиль, не зависящий от библиотек -->
+    <string name="app_name">Clicker</string>
+</resources>
