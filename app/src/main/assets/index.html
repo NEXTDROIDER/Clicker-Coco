@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Coconut Clicker</title>
+    <style>
+        body {
+          text-align: center;
+          font-family: sans-serif;
+        }
+        button {
+          font-size: 30px;
+          padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🥥 Coconut Clicker</h1>
+<button onclick="clickCoco()">КЛИК!</button>
+<p id="score">0</p>
+
+<script>
+    let score = 0;
+
+    function clickCoco() {
+      score++;
+      document.getElementById("score").innerText = score;
+    }
+</script>
+
+</body>
+</html>
